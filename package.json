@@ -1,0 +1,42 @@
+{
+  "name": "waitlister-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for the Waitlister API — manage your waitlist subscribers through AI assistants like Claude, Cursor, and more.",
+  "type": "module",
+  "bin": {
+    "waitlister-mcp": "./build/index.js"
+  },
+  "files": [
+    "build"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build",
+    "start": "node build/index.js",
+    "inspect": "npx @modelcontextprotocol/inspector build/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "waitlist",
+    "waitlister",
+    "model-context-protocol",
+    "ai",
+    "claude",
+    "cursor"
+  ],
+  "author": "Waitlister",
+  "license": "MIT",
+  "homepage": "https://waitlister.me",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/waitlister/waitlister-mcp"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
