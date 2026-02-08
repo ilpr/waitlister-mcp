@@ -29,7 +29,7 @@
   "homepage": "https://waitlister.me",
   "repository": {
     "type": "git",
-    "url": "https://github.com/waitlister/waitlister-mcp"
+    "url": "https://github.com/ilpr/waitlister-mcp"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
