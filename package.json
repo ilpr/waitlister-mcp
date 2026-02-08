@@ -1,6 +1,6 @@
 {
   "name": "waitlister-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP server for the Waitlister API — manage your waitlist subscribers through AI assistants like Claude, Cursor, and more.",
   "type": "module",
   "bin": {
