@@ -1,10 +1,13 @@
 {
-  "name": "waitlister-mcp",
-  "version": "1.0.1",
-  "description": "MCP server for the Waitlister API — manage your waitlist subscribers through AI assistants like Claude, Cursor, and more.",
+  "name": "@waitlister/mcp",
+  "version": "1.1.0",
+  "description": "Official MCP server for the Waitlister API — create waitlists and manage subscribers through AI assistants like Claude, Cursor, and more. Account-key support: works on every plan. (Successor to the waitlister-mcp package.)",
   "type": "module",
   "bin": {
     "waitlister-mcp": "./build/index.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "build"
@@ -34,6 +37,7 @@
   "mcpName": "io.github.ilpr/waitlister",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
+    "waitlister": "^1.1.1",
     "zod": "^3.24.0"
   },
   "devDependencies": {

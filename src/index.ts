@@ -3,76 +3,173 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import {
+  Waitlister,
+  WaitlisterError,
+  ACCOUNT_KEY_PREFIX,
+  type WaitlistScope,
+} from "waitlister";
 
-// Configuration
-const API_BASE = "https://waitlister.me/api/v1";
+// ─── Configuration ──────────────────────────────────────────────────────────
+//
+// Two auth modes (the SDK handles both):
+// - Account key (recommended): WAITLISTER_ACCOUNT_KEY (wl_acct_…, account
+//   Settings → API keys). One key for every waitlist you own, and unlocks
+//   create_waitlist / list_waitlists. Works on every plan (subscriber data
+//   tools still require Growth+).
+// - Legacy per-waitlist key: WAITLISTER_API_KEY + WAITLISTER_WAITLIST_KEY
+//   (Growth+). Existing configurations keep working unchanged.
+//
+// WAITLISTER_WAITLIST_KEY, when set, is the default waitlist for the
+// waitlist-scoped tools; with an account key each tool can also target any
+// owned waitlist via its optional `waitlist_key` parameter.
+
+const ACCOUNT_KEY = process.env.WAITLISTER_ACCOUNT_KEY;
 const API_KEY = process.env.WAITLISTER_API_KEY;
-const WAITLIST_KEY = process.env.WAITLISTER_WAITLIST_KEY;
+const DEFAULT_WAITLIST_KEY = process.env.WAITLISTER_WAITLIST_KEY;
 
-if (!API_KEY) {
-  console.error("Error: WAITLISTER_API_KEY environment variable is required.");
-  process.exit(1);
-}
-
-if (!WAITLIST_KEY) {
+if (!ACCOUNT_KEY && !API_KEY) {
   console.error(
-    "Error: WAITLISTER_WAITLIST_KEY environment variable is required."
+    "Error: set WAITLISTER_ACCOUNT_KEY (recommended — wl_acct_…, from account " +
+      "Settings → API keys, works on every plan) or WAITLISTER_API_KEY + " +
+      "WAITLISTER_WAITLIST_KEY (per-waitlist key, Growth plan+)."
   );
   process.exit(1);
 }
 
-// Helper: make authenticated API requests
-async function apiRequest(
-  path: string,
-  options: RequestInit = {}
-): Promise<unknown> {
-  const url = `${API_BASE}/waitlist/${WAITLIST_KEY}${path}`;
-
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Api-Key": API_KEY!,
-      ...options.headers,
-    },
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    const errorMessage =
-      typeof data === "object" && data !== null && "message" in data
-        ? (data as { message: string }).message
-        : `API error: ${response.status} ${response.statusText}`;
-    throw new Error(errorMessage);
-  }
-
-  return data;
+if (!ACCOUNT_KEY && API_KEY && !API_KEY.startsWith(ACCOUNT_KEY_PREFIX) && !DEFAULT_WAITLIST_KEY) {
+  console.error(
+    "Error: WAITLISTER_API_KEY is a per-waitlist key, so WAITLISTER_WAITLIST_KEY " +
+      "is also required. (Account keys — wl_acct_… — don't need it.)"
+  );
+  process.exit(1);
 }
 
-// Helper: format response for MCP
+const wl = ACCOUNT_KEY
+  ? new Waitlister({ accountKey: ACCOUNT_KEY, waitlistKey: DEFAULT_WAITLIST_KEY })
+  : new Waitlister({ apiKey: API_KEY, waitlistKey: DEFAULT_WAITLIST_KEY });
+
+/** Resolve the waitlist scope for a tool call: explicit param > env default. */
+function scopeFor(waitlistKey?: string): WaitlistScope {
+  const key = waitlistKey ?? DEFAULT_WAITLIST_KEY;
+  if (!key) {
+    throw new Error(
+      "No waitlist specified. Pass `waitlist_key` (find keys with the " +
+        "list_waitlists tool) or set the WAITLISTER_WAITLIST_KEY environment variable."
+    );
+  }
+  return wl.waitlist(key);
+}
+
+// ─── MCP response helpers ───────────────────────────────────────────────────
+
 function textResponse(data: unknown) {
   return {
     content: [
       {
         type: "text" as const,
-        text: JSON.stringify(data, null, 2),
+        text: typeof data === "string" ? data : JSON.stringify(data, null, 2),
       },
     ],
   };
 }
 
-// Create server
+function errorResponse(error: unknown) {
+  const message =
+    error instanceof WaitlisterError || error instanceof Error
+      ? error.message
+      : String(error);
+  return {
+    content: [{ type: "text" as const, text: `Error: ${message}` }],
+    isError: true,
+  };
+}
+
+/** Run a tool body, mapping SDK errors to clean MCP error responses. */
+async function run(fn: () => Promise<unknown>) {
+  try {
+    return textResponse(await fn());
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+// Shared parameter: which waitlist a scoped tool targets.
+const waitlistKeyParam = z
+  .string()
+  .optional()
+  .describe(
+    "The waitlist key (12 characters, from list_waitlists or the dashboard). " +
+      "Optional if WAITLISTER_WAITLIST_KEY is set."
+  );
+
+// ─── Server ─────────────────────────────────────────────────────────────────
+
 const server = new McpServer({
   name: "waitlister",
-  version: "1.0.0",
+  version: "1.1.0",
 });
+
+// ─── Tool: Create Waitlist ──────────────────────────────────────────────────
+
+server.tool(
+  "create_waitlist",
+  "Create a new waitlist on your Waitlister account (requires an account key, works on every plan within its waitlist cap). Returns the waitlist key and a form_action_url that collects signups immediately. Note: waitlist names and URL slugs are unique across all of Waitlister — a taken name/slug is rejected with guidance to pick another.",
+  {
+    name: z.string().describe("The product/waitlist name"),
+    slug: z
+      .string()
+      .optional()
+      .describe("URL slug (derived from name when omitted; must be globally unique)"),
+    description: z.string().optional().describe("Internal description"),
+    category: z.string().optional().describe("Product category"),
+    referral_rewards_enabled: z
+      .boolean()
+      .optional()
+      .describe("Enable the referral program (points for signups and referrals)"),
+    validate_emails: z
+      .boolean()
+      .optional()
+      .describe("Validate email deliverability at signup (default true)"),
+  },
+  async ({ name, slug, description, category, referral_rewards_enabled, validate_emails }) =>
+    run(() =>
+      wl.waitlists.create({
+        name,
+        slug,
+        description,
+        category,
+        ...(referral_rewards_enabled !== undefined
+          ? { referralRewards: { enabled: referral_rewards_enabled } }
+          : {}),
+        validateEmails: validate_emails,
+      })
+    )
+);
+
+// ─── Tool: List Waitlists ───────────────────────────────────────────────────
+
+server.tool(
+  "list_waitlists",
+  "List every waitlist your account owns, with subscriber and view counts (requires an account key).",
+  {},
+  async () => run(() => wl.waitlists.list())
+);
+
+// ─── Tool: Get Stats ────────────────────────────────────────────────────────
+
+server.tool(
+  "get_stats",
+  "Get a waitlist's subscriber and view counters — cheap social proof, works on every plan. Counters update asynchronously (within seconds of a signup or delete).",
+  { waitlist_key: waitlistKeyParam },
+  async ({ waitlist_key }) => run(() => scopeFor(waitlist_key).stats())
+);
 
 // ─── Tool: Add Subscriber ───────────────────────────────────────────────────
 
 server.tool(
   "add_subscriber",
-  "Add a new subscriber to your Waitlister waitlist. Returns their position, referral code, and sign-up token.",
+  "Add a new subscriber to a waitlist. Returns their position, referral code, and sign-up token. Idempotent per email: an existing email returns is_new_sign_up: false with their current position, not an error. Works on every plan.",
   {
     email: z.string().email().describe("The subscriber's email address"),
     name: z.string().optional().describe("The subscriber's name"),
@@ -87,32 +184,25 @@ server.tool(
       .describe(
         "Additional custom fields to store with the subscriber (e.g. company, role)"
       ),
+    waitlist_key: waitlistKeyParam,
   },
-  async ({ email, name, phone, referred_by, metadata }) => {
-    const body: Record<string, unknown> = { email };
-    if (name) body.name = name;
-    if (phone) body.phone = phone;
-    if (referred_by || metadata) {
-      body.metadata = {
-        ...(metadata || {}),
-        ...(referred_by ? { referred_by } : {}),
-      };
-    }
-
-    const data = await apiRequest("/sign-up", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-
-    return textResponse(data);
-  }
+  async ({ email, name, phone, referred_by, metadata, waitlist_key }) =>
+    run(() =>
+      scopeFor(waitlist_key).signUp({
+        email,
+        name,
+        phone,
+        referredBy: referred_by,
+        metadata,
+      })
+    )
 );
 
 // ─── Tool: List Subscribers ─────────────────────────────────────────────────
 
 server.tool(
   "list_subscribers",
-  "Retrieve a paginated list of subscribers from your waitlist. Supports sorting by position, points, date, referral_count, or email.",
+  "Retrieve a paginated list of a waitlist's subscribers, sortable by position, points, date, referral_count, or email. Requires the Growth plan or higher.",
   {
     limit: z
       .number()
@@ -133,108 +223,95 @@ server.tool(
       .enum(["asc", "desc"])
       .default("desc")
       .describe("Sort direction (default: desc)"),
+    waitlist_key: waitlistKeyParam,
   },
-  async ({ limit, page, sort_by, sort_dir }) => {
-    const params = new URLSearchParams({
-      limit: limit.toString(),
-      page: page.toString(),
-      sort_by,
-      sort_dir,
-    });
-
-    const data = await apiRequest(`/subscribers?${params.toString()}`);
-    return textResponse(data);
-  }
+  async ({ limit, page, sort_by, sort_dir, waitlist_key }) =>
+    run(() =>
+      scopeFor(waitlist_key).subscribers.list({
+        limit,
+        page,
+        sortBy: sort_by,
+        sortDir: sort_dir,
+      })
+    )
 );
 
 // ─── Tool: Get Subscriber ───────────────────────────────────────────────────
 
 server.tool(
   "get_subscriber",
-  "Retrieve detailed information about a specific subscriber by their ID or email address. Returns position, points, referral info, metadata, location, and more.",
+  "Retrieve detailed information about a specific subscriber by their ID or email address — position, points, referral info, metadata, location, and more. Requires the Growth plan or higher.",
   {
-    id_or_email: z
-      .string()
-      .describe(
-        "The subscriber's unique ID or email address"
-      ),
+    id_or_email: z.string().describe("The subscriber's unique ID or email address"),
+    waitlist_key: waitlistKeyParam,
   },
-  async ({ id_or_email }) => {
-    const encoded = encodeURIComponent(id_or_email);
-    const data = await apiRequest(`/subscribers/${encoded}`);
-    return textResponse(data);
-  }
+  async ({ id_or_email, waitlist_key }) =>
+    run(() => scopeFor(waitlist_key).subscribers.get(id_or_email))
 );
 
 // ─── Tool: Update Subscriber ────────────────────────────────────────────────
 
 server.tool(
   "update_subscriber",
-  "Update an existing subscriber's information. You can update their name, phone, points, and/or custom metadata. Only include fields you want to change.",
+  "Update an existing subscriber's name, phone, points, and/or custom metadata. Only include fields you want to change; updating points triggers a queue position recalculation. Requires the Growth plan or higher.",
   {
-    id_or_email: z
-      .string()
-      .describe(
-        "The subscriber's unique ID or email address"
-      ),
+    id_or_email: z.string().describe("The subscriber's unique ID or email address"),
     name: z.string().optional().describe("Updated name"),
     phone: z.string().optional().describe("Updated phone number"),
     points: z.number().optional().describe("Updated points value"),
     metadata: z
       .record(z.string())
       .optional()
-      .describe(
-        "Custom fields to add or update (merged with existing metadata)"
-      ),
+      .describe("Custom fields to add or update (merged with existing metadata)"),
+    waitlist_key: waitlistKeyParam,
   },
-  async ({ id_or_email, name, phone, points, metadata }) => {
-    const body: Record<string, unknown> = {};
-    if (name !== undefined) body.name = name;
-    if (phone !== undefined) body.phone = phone;
-    if (points !== undefined) body.points = points;
-    if (metadata !== undefined) body.metadata = metadata;
+  async ({ id_or_email, name, phone, points, metadata, waitlist_key }) =>
+    run(() =>
+      scopeFor(waitlist_key).subscribers.update(id_or_email, {
+        name,
+        phone,
+        points,
+        metadata,
+      })
+    )
+);
 
-    const encoded = encodeURIComponent(id_or_email);
-    const data = await apiRequest(`/subscribers/${encoded}`, {
-      method: "PUT",
-      body: JSON.stringify(body),
-    });
+// ─── Tool: Delete Subscriber ────────────────────────────────────────────────
 
-    return textResponse(data);
-  }
+server.tool(
+  "delete_subscriber",
+  "Permanently delete a subscriber (and their email history) from a waitlist by ID or email address. This cannot be undone. Counters and queue positions update asynchronously within a few seconds. Requires the Growth plan or higher.",
+  {
+    id_or_email: z.string().describe("The subscriber's unique ID or email address"),
+    waitlist_key: waitlistKeyParam,
+  },
+  async ({ id_or_email, waitlist_key }) =>
+    run(() => scopeFor(waitlist_key).subscribers.delete(id_or_email))
 );
 
 // ─── Tool: Log View ─────────────────────────────────────────────────────────
 
 server.tool(
   "log_view",
-  "Record a view of your waitlist page. Useful for tracking engagement and calculating conversion rates.",
+  "Record a view of a waitlist page — useful for tracking engagement and conversion rates when you host your own landing page.",
   {
     visitor_id: z
       .string()
       .optional()
-      .describe(
-        "Unique identifier for the visitor (prevents duplicate counts)"
-      ),
+      .describe("Unique identifier for the visitor (prevents duplicate counts)"),
     referring_domain: z
       .string()
       .optional()
       .describe("Domain that referred the view"),
+    waitlist_key: waitlistKeyParam,
   },
-  async ({ visitor_id, referring_domain }) => {
-    const body: Record<string, unknown> = {};
-    if (visitor_id) body.visitor_id = visitor_id;
-    if (referring_domain) {
-      body.metadata = { referring_domain };
-    }
-
-    const data = await apiRequest("/log-view", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-
-    return textResponse(data);
-  }
+  async ({ visitor_id, referring_domain, waitlist_key }) =>
+    run(() =>
+      scopeFor(waitlist_key).analytics.logView({
+        visitorId: visitor_id,
+        metadata: referring_domain ? { referring_domain } : undefined,
+      })
+    )
 );
 
 // ─── Start Server ───────────────────────────────────────────────────────────
