@@ -1,0 +1,38 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ilpr/waitlister",
+  "description": "Create and run product-launch waitlists on Waitlister: create waitlists, publish hosted landing pages (incl. AI-generated), add signups with referral tracking, manage subscribers, and read stats. Account keys work on every plan.",
+  "repository": {
+    "url": "https://github.com/ilpr/waitlister-mcp",
+    "source": "github"
+  },
+  "version": "1.2.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@waitlister/mcp",
+      "version": "1.2.0",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "WAITLISTER_ACCOUNT_KEY",
+          "description": "Account API key (wl_acct_…) from waitlister.me Settings → API keys. Works on every plan; enables waitlist creation and all landing-page tools.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "WAITLISTER_API_KEY",
+          "description": "Legacy alternative: per-waitlist API key (wl_…, Growth+ plans) used together with WAITLISTER_WAITLIST_KEY.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "WAITLISTER_WAITLIST_KEY",
+          "description": "Default waitlist key for per-waitlist-key mode or to scope tools to one waitlist.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}
