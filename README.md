@@ -9,6 +9,9 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 Once connected, you can ask your AI assistant things like:
 
 - "Create a waitlist for my new product and give me the signup form URL"
+- "Launch my waitlist with a landing page — dark theme — and publish it"
+- "Change the page headline to 'Join 500+ others'"
+- "Generate a landing page: bold, dev-tool aesthetic" (AI builder, 1 credit)
 - "Add test@gmail.com to my waitlist"
 - "How many subscribers do I have?"
 - "Look up the subscriber john@acme.com"
@@ -19,7 +22,7 @@ Once connected, you can ask your AI assistant things like:
 
 | Tool | Description | Plan |
 | --- | --- | --- |
-| `create_waitlist` | Create a new waitlist; returns its key + a form URL that collects signups immediately | Every plan (account key) |
+| `create_waitlist` | Create a new waitlist; returns its key + a form URL that collects signups immediately. Optionally provisions its landing page (draft) in the same call | Every plan (account key) |
 | `list_waitlists` | List every waitlist you own, with subscriber/view counts | Every plan (account key) |
 | `get_stats` | Subscriber + view counters for a waitlist (cheap social proof) | Every plan |
 | `add_subscriber` | Add a new subscriber to a waitlist | Every plan |
@@ -28,6 +31,13 @@ Once connected, you can ask your AI assistant things like:
 | `update_subscriber` | Update a subscriber's name, phone, points, or metadata | Growth+ |
 | `delete_subscriber` | Permanently delete a subscriber (irreversible) | Growth+ |
 | `log_view` | Record a waitlist page view for analytics | Every plan |
+| `get_landing_page` | Structured view of the hosted landing page: status, copy, theme, SEO, live URL, analytics | Every plan |
+| `create_landing_page` | Create the page from structured fields (draft; one page per waitlist) | Every plan |
+| `update_landing_page` | Update copy/theme/background/SEO; live pages update immediately | Every plan |
+| `publish_landing_page` | Go live at `waitlister.me/p/{slug}` (or unpublish) | Every plan |
+| `generate_landing_page` | AI-generate or AI-edit the whole page from a prompt (**1 AI credit per call**, ~20–50s) | Every plan |
+
+**AI pages vs standard pages:** after `generate_landing_page`, the page's copy lives inside the generated page — `update_landing_page` rejects copy/structure fields with guidance to use `generate_landing_page` + `is_edit` instead (`theme` and `seo` still update normally). Generated pages are saved as drafts, and the AI conversation carries over to the dashboard's AI chat.
 
 ## Prerequisites
 

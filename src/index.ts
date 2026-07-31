@@ -8,6 +8,7 @@ import {
   WaitlisterError,
   ACCOUNT_KEY_PREFIX,
   type WaitlistScope,
+  type UpdateLandingPageParams,
 } from "waitlister";
 
 // ─── Configuration ──────────────────────────────────────────────────────────
@@ -107,14 +108,14 @@ const waitlistKeyParam = z
 
 const server = new McpServer({
   name: "waitlister",
-  version: "1.1.0",
+  version: "1.2.0",
 });
 
 // ─── Tool: Create Waitlist ──────────────────────────────────────────────────
 
 server.tool(
   "create_waitlist",
-  "Create a new waitlist on your Waitlister account (requires an account key, works on every plan within its waitlist cap). Returns the waitlist key and a form_action_url that collects signups immediately. Note: waitlist names and URL slugs are unique across all of Waitlister — a taken name/slug is rejected with guidance to pick another.",
+  "Create a new waitlist on your Waitlister account (requires an account key, works on every plan within its waitlist cap). Returns the waitlist key and a form_action_url that collects signups immediately. Pass landing_page to also provision the hosted landing page (as a draft — go live with publish_landing_page) in the same call. Note: waitlist names and URL slugs are unique across all of Waitlister — a taken name/slug is rejected with guidance to pick another.",
   {
     name: z.string().describe("The product/waitlist name"),
     slug: z
@@ -131,8 +132,33 @@ server.tool(
       .boolean()
       .optional()
       .describe("Validate email deliverability at signup (default true)"),
+    landing_page: z
+      .object({
+        headline: z
+          .string()
+          .min(3)
+          .max(120)
+          .describe("The page's main title (3-120 characters, plain text)"),
+        description: z.string().max(1000).optional(),
+        button_text: z.string().max(40).optional(),
+        collect_name: z.boolean().optional(),
+        collect_phone: z.boolean().optional(),
+        theme: z.enum(["light", "dark"]).optional(),
+      })
+      .optional()
+      .describe(
+        "Also create the hosted landing page (draft) in the same request. headline required. More fields (background, SEO) via update_landing_page afterwards."
+      ),
   },
-  async ({ name, slug, description, category, referral_rewards_enabled, validate_emails }) =>
+  async ({
+    name,
+    slug,
+    description,
+    category,
+    referral_rewards_enabled,
+    validate_emails,
+    landing_page,
+  }) =>
     run(() =>
       wl.waitlists.create({
         name,
@@ -143,6 +169,18 @@ server.tool(
           ? { referralRewards: { enabled: referral_rewards_enabled } }
           : {}),
         validateEmails: validate_emails,
+        ...(landing_page !== undefined
+          ? {
+              landingPage: {
+                headline: landing_page.headline,
+                description: landing_page.description,
+                buttonText: landing_page.button_text,
+                collectName: landing_page.collect_name,
+                collectPhone: landing_page.collect_phone,
+                theme: landing_page.theme,
+              },
+            }
+          : {}),
       })
     )
 );
@@ -312,6 +350,198 @@ server.tool(
         metadata: referring_domain ? { referring_domain } : undefined,
       })
     )
+);
+
+// ─── Landing-page tools ─────────────────────────────────────────────────────
+//
+// Works on every plan. One page per waitlist; pages are drafts until
+// published. Two page types: "standard" (built from the structured fields
+// below, editable in the dashboard's drag-and-drop editor) and "ai" (built by
+// generate_landing_page — its copy lives inside the generated page, so the
+// structured copy fields 409 on update; use generate with is_edit instead;
+// theme and seo update fine on both types).
+
+const landingPageContentShape = {
+  headline: z
+    .string()
+    .min(3)
+    .max(120)
+    .optional()
+    .describe("The page's main title (3-120 characters, plain text — no HTML)"),
+  description: z
+    .string()
+    .max(1000)
+    .optional()
+    .describe("Supporting copy under the headline (max 1000 characters, plain text)"),
+  button_text: z
+    .string()
+    .max(40)
+    .optional()
+    .describe('Submit-button label (max 40 characters, default "Join the waitlist")'),
+  collect_name: z
+    .boolean()
+    .optional()
+    .describe("Add (true) or remove (false) a name input on the signup form"),
+  collect_phone: z
+    .boolean()
+    .optional()
+    .describe("Add (true) or remove (false) a phone input on the signup form"),
+  background: z
+    .object({
+      type: z.enum(["color", "gradient"]),
+      value: z
+        .string()
+        .describe(
+          'Hex color (e.g. "#0F172A") or CSS gradient string (e.g. "linear-gradient(to right, #0F172A, #1E293B)")'
+        ),
+    })
+    .optional()
+    .describe("Page background (image backgrounds are dashboard-only)"),
+  theme: z.enum(["light", "dark"]).optional().describe("Page theme"),
+  seo: z
+    .object({
+      title: z.string().max(70).optional(),
+      description: z.string().max(200).optional(),
+      keywords: z.array(z.string().max(40)).max(10).optional(),
+      og_title: z.string().max(70).optional(),
+      og_description: z.string().max(200).optional(),
+    })
+    .optional()
+    .describe("Search/social metadata for the hosted page"),
+};
+
+type LandingPageContentArgs = {
+  headline?: string;
+  description?: string;
+  button_text?: string;
+  collect_name?: boolean;
+  collect_phone?: boolean;
+  background?: { type: "color" | "gradient"; value: string };
+  theme?: "light" | "dark";
+  seo?: {
+    title?: string;
+    description?: string;
+    keywords?: string[];
+    og_title?: string;
+    og_description?: string;
+  };
+};
+
+function toLandingPageParams(args: LandingPageContentArgs): UpdateLandingPageParams {
+  return {
+    headline: args.headline,
+    description: args.description,
+    buttonText: args.button_text,
+    collectName: args.collect_name,
+    collectPhone: args.collect_phone,
+    background: args.background,
+    theme: args.theme,
+    ...(args.seo
+      ? {
+          seo: {
+            title: args.seo.title,
+            description: args.seo.description,
+            keywords: args.seo.keywords,
+            ogTitle: args.seo.og_title,
+            ogDescription: args.seo.og_description,
+          },
+        }
+      : {}),
+  };
+}
+
+server.registerTool(
+  "get_landing_page",
+  {
+    description:
+      "Get the structured view of a waitlist's hosted landing page: status (draft/published/unpublished), page_type (standard or ai), copy fields, theme, SEO, the live URL (null until published), and view/signup analytics. AI-built pages also return remaining AI credits. Works on every plan. 404 if the waitlist has no page yet — create one with create_landing_page.",
+    inputSchema: { waitlist_key: waitlistKeyParam },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ waitlist_key }) => run(() => scopeFor(waitlist_key).landingPage.get())
+);
+
+server.registerTool(
+  "create_landing_page",
+  {
+    description:
+      "Create the waitlist's hosted landing page from structured fields, as a draft (nothing goes live until publish_landing_page). One page per waitlist — returns a 409 error if one already exists (use update_landing_page then). headline is required. Works on every plan. Tip: when creating a new waitlist AND its page, use create_waitlist's landing_page parameter instead — one call.",
+    inputSchema: {
+      ...landingPageContentShape,
+      headline: z
+        .string()
+        .min(3)
+        .max(120)
+        .describe("The page's main title (3-120 characters, plain text — no HTML)"),
+      waitlist_key: waitlistKeyParam,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+  },
+  async ({ waitlist_key, ...content }) =>
+    run(() =>
+      scopeFor(waitlist_key).landingPage.create({
+        ...toLandingPageParams(content),
+        headline: content.headline,
+      })
+    )
+);
+
+server.registerTool(
+  "update_landing_page",
+  {
+    description:
+      "Update any subset of the landing page's structured fields. On a published page the change goes live immediately. IMPORTANT: on an AI-built page (page_type \"ai\"), the copy/structure fields (headline, description, button_text, collect_name, collect_phone, background) return a 409 error — edit those with generate_landing_page and is_edit: true; theme and seo still work here on both page types. Works on every plan.",
+    inputSchema: { ...landingPageContentShape, waitlist_key: waitlistKeyParam },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+  },
+  async ({ waitlist_key, ...content }) =>
+    run(() => scopeFor(waitlist_key).landingPage.update(toLandingPageParams(content)))
+);
+
+server.registerTool(
+  "publish_landing_page",
+  {
+    description:
+      "Publish the landing page to its live URL (https://waitlister.me/p/{slug}, or the waitlist's custom domain) — or take it offline with unpublish: true. Publishing validates the page has an email field, a submit button, and a headline of at least 3 characters. API publishes skip the custom social-share (OG) image; publishing once from the dashboard generates it. Works on every plan.",
+    inputSchema: {
+      unpublish: z
+        .boolean()
+        .optional()
+        .describe("true takes the page offline instead of publishing it"),
+      waitlist_key: waitlistKeyParam,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+  },
+  async ({ unpublish, waitlist_key }) =>
+    run(() =>
+      unpublish
+        ? scopeFor(waitlist_key).landingPage.unpublish()
+        : scopeFor(waitlist_key).landingPage.publish()
+    )
+);
+
+server.registerTool(
+  "generate_landing_page",
+  {
+    description:
+      "Generate a complete custom landing page from a natural-language prompt with Waitlister's AI builder (same engine as the dashboard), or edit the existing AI page with is_edit: true. COSTS 1 AI CREDIT per call (shared with the dashboard AI builder; errors with the balance when out of credits) — don't call repeatedly for small tweaks a human should review. Synchronous, typically 20-50 seconds. The result is saved as a draft: review in the dashboard or go live with publish_landing_page. The AI conversation is saved, so the dashboard's AI chat continues where this left off. After generating, the page is an AI page — see update_landing_page for what that changes.",
+    inputSchema: {
+      prompt: z
+        .string()
+        .max(2000)
+        .describe('What to build or change, in natural language (e.g. "dark, bold, dev-tool aesthetic")'),
+      is_edit: z
+        .boolean()
+        .optional()
+        .describe(
+          "true edits the existing AI page instead of generating a fresh one (409 if there is no AI page yet)"
+        ),
+      waitlist_key: waitlistKeyParam,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+  },
+  async ({ prompt, is_edit, waitlist_key }) =>
+    run(() => scopeFor(waitlist_key).landingPage.generate({ prompt, isEdit: is_edit }))
 );
 
 // ─── Start Server ───────────────────────────────────────────────────────────
