@@ -1,0 +1,24 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "waitlister",
+  "version": "1.2.0",
+  "description": "Create product-launch waitlists and publish hosted landing pages without leaving Claude.",
+  "author": {
+    "name": "Waitlister",
+    "url": "https://waitlister.me"
+  },
+  "homepage": "https://waitlister.me",
+  "repository": "https://github.com/ilpr/waitlister-mcp",
+  "license": "MIT",
+  "keywords": [
+    "waitlist",
+    "landing-page",
+    "product-launch",
+    "signups",
+    "referrals",
+    "marketing"
+  ],
+  "skills": [
+    "./skills/getting-started"
+  ]
+}

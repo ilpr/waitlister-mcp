@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "waitlister": {
+      "command": "npx",
+      "args": ["-y", "@waitlister/mcp"],
+      "env": {
+        "WAITLISTER_ACCOUNT_KEY": "${WAITLISTER_ACCOUNT_KEY}"
+      }
+    }
+  }
+}

@@ -156,6 +156,40 @@ WAITLISTER_ACCOUNT_KEY=wl_acct_your-key npm run inspect
 - [API Documentation](https://waitlister.me/docs/api)
 - [MCP Protocol](https://modelcontextprotocol.io/)
 
+## Privacy
+
+Full policy: https://waitlister.me/privacy-policy
+
+**What this extension collects.** Nothing on its own. It runs locally on your machine and
+holds no database, no telemetry, and no analytics. It stores only the credential you
+enter — your Waitlister account API key — which Claude Desktop keeps in your operating
+system's secure credential storage.
+
+**What it sends, and where.** The extension sends the API requests you ask it to make,
+over HTTPS, to the Waitlister API at `https://waitlister.me/api/v1`, authenticated with
+your key. That means the arguments you (or Claude, on your instruction) pass to a tool:
+for example a waitlist name, landing-page copy, or a subscriber's email address when you
+add one. Nothing is sent anywhere else. There are no third-party analytics, error
+trackers, or intermediary services in the path.
+
+**How that data is used and retained.** Data reaching the Waitlister API is handled under
+the Waitlister privacy policy linked above — the same terms that apply when you use the
+web dashboard. Waitlist and subscriber records persist in your Waitlister account until
+you delete them, from the dashboard or with the `delete_subscriber` tool. The extension
+itself retains nothing after a request completes.
+
+**Third-party sharing.** Waitlister does not sell your data. Landing-page designs
+requested through `generate_landing_page` are produced by Waitlister's AI page builder,
+which passes your design prompt to a third-party model provider; see the privacy policy
+for the current subprocessor list.
+
+**Your controls.** Revoke the API key at any time in Waitlister under Settings → API
+keys, which immediately stops this extension from reaching your account. Uninstalling the
+extension removes the stored key from your machine. Account and data deletion requests
+follow the process in the privacy policy.
+
+**Contact.** https://waitlister.me/contact
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
