@@ -25,6 +25,12 @@ own — the user never needs to touch the dashboard to get started.
 Never ask the user to paste the key into the chat. If they do anyway, tell them to
 revoke it in Settings → API keys and issue a new one.
 
+**Confirm the key with `get_account` before doing anything else.** It is read-only and
+answers three things in one call: whether the key is alive (an invalid or revoked key
+fails here, so a dead key stops looking like a malformed request), the plan, and
+`waitlists.can_create` — whether the next `create_waitlist` would actually succeed. Check
+that rather than discovering the plan's waitlist cap from an error partway through a setup.
+
 ## 2. Launch a waitlist in one step
 
 `create_waitlist` provisions the waitlist and its landing page in a single call — prefer

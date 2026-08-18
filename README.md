@@ -8,6 +8,7 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that 
 
 Once connected, you can ask your AI assistant things like:
 
+- "Is my Waitlister key working, and can I create another waitlist?"
 - "Create a waitlist for my new product and give me the signup form URL"
 - "Launch my waitlist with a landing page — dark theme — and publish it"
 - "Change the page headline to 'Join 500+ others'"
@@ -22,6 +23,7 @@ Once connected, you can ask your AI assistant things like:
 
 | Tool | Description | Plan |
 | --- | --- | --- |
+| `get_account` | Check the key and what the account may do: plan, waitlist count vs cap, whether the next `create_waitlist` would succeed, AI credits. Read-only | Every plan (account key) |
 | `create_waitlist` | Create a new waitlist; returns its key + a form URL that collects signups immediately. Optionally provisions its landing page (draft) in the same call | Every plan (account key) |
 | `list_waitlists` | List every waitlist you own, with subscriber/view counts | Every plan (account key) |
 | `get_stats` | Subscriber + view counters for a waitlist (cheap social proof) | Every plan |

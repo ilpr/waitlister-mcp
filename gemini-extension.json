@@ -1,6 +1,6 @@
 {
   "name": "waitlister",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Create product-launch waitlists and publish hosted landing pages from Gemini CLI. Signups get a queue position and a referral link.",
   "mcpServers": {
     "waitlister": {

@@ -108,7 +108,7 @@ const waitlistKeyParam = z
 
 const server = new McpServer({
   name: "waitlister",
-  version: "1.2.0",
+  version: "1.3.0",
 });
 
 // ─── Tool: Create Waitlist ──────────────────────────────────────────────────
@@ -183,6 +183,19 @@ server.tool(
           : {}),
       })
     )
+);
+
+// ─── Tool: Get Account ──────────────────────────────────────────────────────
+
+server.registerTool(
+  "get_account",
+  {
+    description:
+      "Check the configured API key and what this account may do — the cheapest first call, and the one to make when anything looks misconfigured. Returns the account, the plan name, whether the general API is available, how many waitlists the account has against its cap, whether creating another would succeed right now (can_create — a true dry run, so check it before create_waitlist rather than discovering the cap from an error), remaining AI credits, and the key's name/created/last-used. An invalid or revoked key fails here cleanly, which distinguishes a dead key from a malformed request. Requires an account key (wl_acct_…) and works on every plan. Never returns the key itself.",
+    inputSchema: {},
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  async () => run(() => wl.me())
 );
 
 // ─── Tool: List Waitlists ───────────────────────────────────────────────────
