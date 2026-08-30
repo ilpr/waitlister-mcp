@@ -174,6 +174,13 @@ for example a waitlist name, landing-page copy, or a subscriber's email address 
 add one. Nothing is sent anywhere else. There are no third-party analytics, error
 trackers, or intermediary services in the path.
 
+**How requests identify themselves.** Like any SDK, those requests carry identification
+headers so Waitlister can tell agent traffic from ordinary API traffic and support it
+properly: this package's name and version (`waitlister-mcp/1.4.0`), the SDK version, the
+Node version, and the name and version your MCP host announces in the protocol handshake
+(e.g. `claude-ai/0.1.0`). No prompt text, no file paths, no machine or user identifiers.
+Nothing extra is sent — these ride along on requests you already made.
+
 **How that data is used and retained.** Data reaching the Waitlister API is handled under
 the Waitlister privacy policy linked above — the same terms that apply when you use the
 web dashboard. Waitlist and subscriber records persist in your Waitlister account until

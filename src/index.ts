@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createRequire } from "node:module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -46,9 +47,21 @@ if (!ACCOUNT_KEY && API_KEY && !API_KEY.startsWith(ACCOUNT_KEY_PREFIX) && !DEFAU
   process.exit(1);
 }
 
+// Read from package.json rather than a constant, so the version this server
+// reports can never drift from the version that was published.
+const { version: MCP_VERSION } = createRequire(import.meta.url)("../package.json") as {
+  version: string;
+};
+
+// Identify ourselves on every API call. Without this an MCP tool call is
+// byte-identical to any other SDK call, so nothing server-side can measure what
+// agents actually do — see the AX notes in the marketing engine's ax.md. The
+// host that drives us is added at initialize (main() below).
+const CLIENT = { name: "waitlister-mcp", version: MCP_VERSION };
+
 const wl = ACCOUNT_KEY
-  ? new Waitlister({ accountKey: ACCOUNT_KEY, waitlistKey: DEFAULT_WAITLIST_KEY })
-  : new Waitlister({ apiKey: API_KEY, waitlistKey: DEFAULT_WAITLIST_KEY });
+  ? new Waitlister({ accountKey: ACCOUNT_KEY, waitlistKey: DEFAULT_WAITLIST_KEY, client: CLIENT })
+  : new Waitlister({ apiKey: API_KEY, waitlistKey: DEFAULT_WAITLIST_KEY, client: CLIENT });
 
 /** Resolve the waitlist scope for a tool call: explicit param > env default. */
 function scopeFor(waitlistKey?: string): WaitlistScope {
@@ -560,9 +573,18 @@ server.registerTool(
 // ─── Start Server ───────────────────────────────────────────────────────────
 
 async function main() {
+  // The host only names itself in the initialize handshake, which lands after
+  // connect() — so hook the notification rather than reading it inline. The SDK
+  // sanitizes the value; a host names itself whatever it likes.
+  server.server.oninitialized = () => {
+    const host = server.server.getClientVersion();
+    if (!host?.name) return;
+    wl.setAgent(host.version ? `${host.name}/${host.version}` : host.name);
+  };
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Waitlister MCP server running on stdio");
+  console.error(`Waitlister MCP server ${MCP_VERSION} running on stdio`);
 }
 
 main().catch((error) => {
