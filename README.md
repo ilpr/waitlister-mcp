@@ -18,6 +18,7 @@ Once connected, you can ask your AI assistant things like:
 - "Look up the subscriber john@acme.com"
 - "Update John's points to 500"
 - "Show me the top 10 subscribers by referral count"
+- "Tag everyone with 3+ referrals as beta, then list who's tagged beta"
 
 ## Tools
 
@@ -26,17 +27,19 @@ Once connected, you can ask your AI assistant things like:
 | `get_account` | Check the key and what the account may do: plan, waitlist count vs cap, whether the next `create_waitlist` would succeed, AI credits. Read-only | Every plan (account key) |
 | `create_waitlist` | Create a new waitlist; returns its key + a form URL that collects signups immediately. Optionally provisions its landing page (draft) in the same call | Every plan (account key) |
 | `list_waitlists` | List every waitlist you own, with subscriber/view counts | Every plan (account key) |
-| `get_stats` | Subscriber + view counters for a waitlist (cheap social proof) | Every plan |
+| `get_stats` | Subscriber + view counters for a waitlist | Every plan |
 | `add_subscriber` | Add a new subscriber to a waitlist | Every plan |
-| `list_subscribers` | List subscribers with pagination and sorting | Growth+ |
-| `get_subscriber` | Get details for a specific subscriber by ID or email | Growth+ |
-| `update_subscriber` | Update a subscriber's name, phone, points, or metadata | Growth+ |
+| `list_subscribers` | List subscribers with pagination and sorting, optionally only those with one tag | Growth+ |
+| `get_subscriber` | Get details for a specific subscriber by ID or email, including tags | Growth+ |
+| `update_subscriber` | Update a subscriber's name, phone, points, metadata, or tags (add, remove, or replace; new tag names are created) | Growth+ |
 | `delete_subscriber` | Permanently delete a subscriber (irreversible) | Growth+ |
+| `list_tags` | List the waitlist's subscriber tags and how many subscribers have each | Growth+ |
 | `log_view` | Record a waitlist page view for analytics | Every plan |
 | `get_landing_page` | Structured view of the hosted landing page: status, copy, theme, SEO, live URL, analytics | Every plan |
 | `create_landing_page` | Create the page from structured fields (draft; one page per waitlist) | Every plan |
 | `update_landing_page` | Update copy/theme/background/SEO; live pages update immediately | Every plan |
-| `publish_landing_page` | Go live at `waitlister.me/p/{slug}` (or unpublish) | Every plan |
+| `publish_landing_page` | Go live at `waitlister.me/p/{slug}` | Every plan |
+| `unpublish_landing_page` | Take the live page offline (page and subscribers are kept) | Every plan |
 | `generate_landing_page` | AI-generate or AI-edit the whole page from a prompt (**1 AI credit per call**, ~20–50s) | Every plan |
 
 **AI pages vs standard pages:** after `generate_landing_page`, the page's copy lives inside the generated page — `update_landing_page` rejects copy/structure fields with guidance to use `generate_landing_page` + `is_edit` instead (`theme` and `seo` still update normally). Generated pages are saved as drafts, and the AI conversation carries over to the dashboard's AI chat.

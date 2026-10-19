@@ -68,13 +68,16 @@ every plan, by design. If the user asks for one of those, point them at the dash
 rather than trying a tool call.
 
 Subscriber management (`list_subscribers`, `get_subscriber`, `update_subscriber`,
-`delete_subscriber`) needs the Growth plan or higher. Creating waitlists, building and
-publishing pages, adding signups, and reading stats work on every plan.
+`delete_subscriber`, `list_tags`) needs the Growth plan or higher. Creating waitlists,
+building and publishing pages, adding signups, and reading stats work on every plan.
+
+Tagging: call `list_tags` before `update_subscriber` with `add_tags`, and reuse an
+existing name. A name the waitlist doesn't have yet becomes a new tag, and a waitlist
+holds at most 20. Recoloring and deleting tags are dashboard-only.
 
 ## 5. Verify before saying it's done
 
 1. Fetch the published URL and confirm the page renders with the user's copy.
 2. Tell them pages stay **drafts until published** — nothing is public until
-   `publish_landing_page` runs. `publish_landing_page` with `unpublish: true` takes it
-   back offline.
+   `publish_landing_page` runs. `unpublish_landing_page` takes it back offline.
 3. Signup email validation rejects fake addresses, so test with a real one.
