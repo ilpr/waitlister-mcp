@@ -125,6 +125,10 @@ Go to **Settings** → **MCP** → **Add new MCP server** and use the same confi
 claude mcp add waitlister --env WAITLISTER_ACCOUNT_KEY=wl_acct_your-key -- npx -y @waitlister/mcp
 ```
 
+### Kiro
+
+Install the Waitlister Power: in Kiro, open **Powers** → **Add Custom Power** → **Import power from GitHub** (newer versions: **Import power from a repository URL**), and paste `https://github.com/ilpr/waitlister-mcp/tree/main/kiro-power`. It reads your key from the `WAITLISTER_ACCOUNT_KEY` environment variable. Setup steps are in [kiro-power/README.md](kiro-power/README.md).
+
 ## Environment Variables
 
 | Variable | Required | Description |

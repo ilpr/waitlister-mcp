@@ -1,0 +1,22 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "waitlister",
+  "version": "1.5.0",
+  "description": "Create product-launch waitlists, publish hosted landing pages and manage signups from Kiro.",
+  "author": {
+    "name": "Waitlister",
+    "url": "https://waitlister.me"
+  },
+  "homepage": "https://waitlister.me/docs/mcp",
+  "repository": "https://github.com/ilpr/waitlister-mcp",
+  "license": "MIT",
+  "keywords": [
+    "waitlister",
+    "waitlist",
+    "waitlist landing page",
+    "pre-launch signups",
+    "referral waitlist",
+    "launch page",
+    "early access signups"
+  ]
+}
